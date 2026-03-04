@@ -1,0 +1,26 @@
+# Smithery MCP registry configuration
+# https://smithery.ai
+
+name: Registrum — Companies House API
+description: >
+  Search UK companies, retrieve enriched profiles, structured financial data
+  (parsed from iXBRL filings), director listings with full appointment history,
+  and corporate director network graphs — all in one MCP server backed by the
+  Registrum API.
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      apiKey:
+        type: string
+        description: Your Registrum API key (get one free at registrum.co.uk)
+    required:
+      - apiKey
+  commandFunction: |-
+    (config) => ({
+      command: "npx",
+      args: ["-y", "@registrum/mcp"],
+      env: { REGISTRUM_API_KEY: config.apiKey }
+    })

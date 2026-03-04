@@ -1,0 +1,47 @@
+{
+  "name": "@registrum/mcp",
+  "version": "1.0.0",
+  "description": "MCP server for the Registrum Companies House API — search UK companies, get financials, directors, and director networks",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "companies-house",
+    "uk-companies",
+    "company-data",
+    "financials",
+    "directors",
+    "registrum"
+  ],
+  "homepage": "https://registrum.co.uk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eugenemerwe/registrum-mcp"
+  },
+  "license": "MIT",
+  "author": "Eugene Merwe-Chartier",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "registrum-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
