@@ -2,3 +2,5 @@ src/
 *.map
 tsconfig.json
 smithery.yaml
+dist/*.test.js
+dist/*.test.d.ts
