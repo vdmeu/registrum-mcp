@@ -21,6 +21,7 @@
   "author": "Eugene Merwe-Chartier",
   "type": "module",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "bin": {
     "registrum-mcp": "dist/index.js"
   },
