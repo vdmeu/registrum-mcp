@@ -1,0 +1,29 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.vdmeu/registrum-mcp",
+  "description": "Search UK companies, get financials, directors, and networks via the Registrum Companies House API.",
+  "repository": {
+    "url": "https://github.com/vdmeu/registrum-mcp",
+    "source": "github"
+  },
+  "version": "1.0.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@registrum/mcp",
+      "version": "1.0.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "REGISTRUM_API_KEY",
+          "description": "Your Registrum API key. Get a free key at https://registrum.co.uk (50 calls/month free).",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
