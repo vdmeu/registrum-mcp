@@ -9,6 +9,11 @@ export async function callApi(
   apiKey: string,
   baseUrl: string = API_BASE
 ): Promise<unknown> {
+  if (!apiKey) {
+    throw new Error(
+      "REGISTRUM_API_KEY is not set. Get a free key at https://registrum.co.uk and set it in your MCP client config."
+    );
+  }
   const res = await fetch(`${baseUrl}${path}`, {
     headers: { "X-API-Key": apiKey },
   });

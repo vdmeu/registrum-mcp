@@ -2,13 +2,12 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
 
-const apiKey = process.env.REGISTRUM_API_KEY;
+const apiKey = process.env.REGISTRUM_API_KEY ?? "";
 if (!apiKey) {
   process.stderr.write(
-    "Error: REGISTRUM_API_KEY environment variable is required.\n" +
+    "Warning: REGISTRUM_API_KEY is not set. Tool calls will fail until you set it.\n" +
     "Get a free key at https://registrum.co.uk\n"
   );
-  process.exit(1);
 }
 
 const server = createServer(apiKey);
