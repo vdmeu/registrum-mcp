@@ -1,8 +1,10 @@
 # Registrum MCP Server
 
-Use UK Companies House data directly inside Claude, Cursor, and any other MCP-compatible AI client.
+**No Companies House API key needed.** One Registrum API key gives your AI agent enriched, cached UK company data — structured financials, director networks, and company profiles — directly inside Claude, Cursor, and any MCP-compatible client.
 
-**5 tools, zero boilerplate.** Search companies, pull structured financials, list directors, and map corporate networks — all from the Registrum API.
+Unlike raw Companies House API wrappers that require you to register at the CH developer portal and manage your own rate limits, Registrum handles all of that for you: iXBRL filings parsed into clean JSON, 24h/7d caching, and circuit-breaker resilience on CH outages.
+
+**5 tools, zero boilerplate.** Search companies, pull structured financials, list directors, and map corporate networks.
 
 ---
 
@@ -31,10 +33,6 @@ Get a free API key at [registrum.co.uk](https://registrum.co.uk) (50 calls/month
 ### Cursor
 
 Add to `.cursor/mcp.json` in your project, or to `~/.cursor/mcp.json` globally — same format as above.
-
-### Smithery
-
-Find this server at [smithery.ai/server/@registrum/mcp](https://smithery.ai/server/@registrum/mcp) and install with one click.
 
 ---
 
