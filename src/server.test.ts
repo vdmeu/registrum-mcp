@@ -203,6 +203,48 @@ describe("get_directors tool", () => {
   });
 });
 
+// ─── get_psc ─────────────────────────────────────────────────────────────────
+
+describe("get_psc tool", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("fetches /company/{number}/psc", async () => {
+    const payload = { active_pscs: [], ceased_pscs: [], has_psc_exemption: false };
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(payload),
+    } as Response);
+
+    const client = await makeClient();
+    const result = await client.callTool({
+      name: "get_psc",
+      arguments: { company_number: "00445790" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const url = (spy.mock.calls[0] as unknown[])[0] as string;
+    expect(url).toBe(`${API_BASE}/company/00445790/psc`);
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    expect(JSON.parse(text)).toEqual(payload);
+  });
+
+  it("returns isError on API failure", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: () => Promise.resolve("Not found"),
+    } as Response);
+
+    const client = await makeClient();
+    const result = await client.callTool({
+      name: "get_psc",
+      arguments: { company_number: "99999999" },
+    });
+
+    expect(result.isError).toBe(true);
+  });
+});
+
 // ─── get_network ──────────────────────────────────────────────────────────────
 
 describe("get_network tool", () => {

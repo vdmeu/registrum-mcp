@@ -51,7 +51,7 @@ export function createServer(
         "Use these tools to look up UK companies registered at Companies House. " +
         "Company numbers are zero-padded 8-digit strings (e.g. '00445790' for Tesco PLC). " +
         "When a user gives you a company name, use search_company first to find the number, " +
-        "then use get_company, get_financials, get_directors, or get_network as needed.",
+        "then use get_company, get_financials, get_directors, get_psc, or get_network as needed.",
     }
   );
 
@@ -164,6 +164,35 @@ export function createServer(
     async ({ company_number }) => {
       try {
         const data = await api(`/company/${company_number}/directors`);
+        return text(data);
+      } catch (e) {
+        return err(String(e));
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_psc",
+    {
+      title: "Get persons with significant control",
+      description:
+        "Get the PSC (Persons with Significant Control) register for a UK company. " +
+        "Returns individuals, corporate entities, and legal persons who own 25%+ of shares, " +
+        "hold 25%+ of voting rights, or have significant influence or control. " +
+        "Each PSC includes decoded control types in plain English (e.g. 'Owns 25-50% of shares' " +
+        "instead of raw codes). Corporate entity PSCs include their company number for " +
+        "ownership chain traversal. Also detects PSC exemptions for listed PLCs. " +
+        "Cached for 24 hours.",
+      inputSchema: {
+        company_number: z
+          .string()
+          .regex(/^[A-Z0-9]{1,8}$/)
+          .describe("Companies House company number, e.g. '00445790' for Tesco PLC"),
+      },
+    },
+    async ({ company_number }) => {
+      try {
+        const data = await api(`/company/${company_number}/psc`);
         return text(data);
       } catch (e) {
         return err(String(e));
