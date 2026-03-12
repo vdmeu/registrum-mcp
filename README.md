@@ -6,6 +6,10 @@ Unlike raw Companies House API wrappers that require you to register at the CH d
 
 **5 tools, zero boilerplate.** Search companies, pull structured financials, list directors, and map corporate networks.
 
+<a href="https://glama.ai/mcp/servers/vdmeu/registrum-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/vdmeu/registrum-mcp/badge" alt="RegistrumMCP MCP server" />
+</a>
+
 ---
 
 ## Installation
