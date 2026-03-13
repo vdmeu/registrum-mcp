@@ -51,7 +51,10 @@ export function createServer(
         "Use these tools to look up UK companies registered at Companies House. " +
         "Company numbers are zero-padded 8-digit strings (e.g. '00445790' for Tesco PLC). " +
         "When a user gives you a company name, use search_company first to find the number, " +
-        "then use get_company, get_financials, get_directors, get_psc, or get_network as needed.",
+        "then use get_company, get_financials, get_directors, get_psc, get_psc_chain, or get_network as needed. " +
+        "Use get_psc for a flat view of who controls a company. " +
+        "Use get_psc_chain to trace corporate ownership upward and find the ultimate beneficial owners (UBOs) " +
+        "— it follows corporate entity PSCs recursively until reaching natural persons or foreign entities.",
     }
   );
 
@@ -193,6 +196,47 @@ export function createServer(
     async ({ company_number }) => {
       try {
         const data = await api(`/company/${company_number}/psc`);
+        return text(data);
+      } catch (e) {
+        return err(String(e));
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_psc_chain",
+    {
+      title: "Resolve PSC ownership chain to find ultimate beneficial owners",
+      description:
+        "Trace the full ownership chain for a UK company by recursively following corporate " +
+        "entity PSCs. Returns a tree showing who ultimately controls the company — natural persons " +
+        "(UBOs), foreign entities, or legal persons — along with why each branch terminated. " +
+        "Each node has a terminal_reason: natural_person, foreign_entity, legal_person, " +
+        "super_secure, depth_limit, not_found, cycle_detected, or psc_exempt. " +
+        "chain_metadata reports how many companies were resolved and the total API credit cost. " +
+        "Use this for KYB (Know Your Business) checks, AML screening, or any task requiring " +
+        "beneficial ownership beyond the immediate PSC layer.",
+      inputSchema: {
+        company_number: z
+          .string()
+          .regex(/^[A-Z0-9]{1,8}$/)
+          .describe("Companies House company number, e.g. '12345678'"),
+        max_depth: z
+          .number()
+          .int()
+          .min(1)
+          .max(10)
+          .optional()
+          .describe(
+            "Maximum chain depth to traverse (1-10, default 5). " +
+            "Each level costs 1 upstream API call per corporate entity found."
+          ),
+      },
+    },
+    async ({ company_number, max_depth }) => {
+      try {
+        const params = max_depth ? `?max_depth=${max_depth}` : "";
+        const data = await api(`/company/${company_number}/psc/chain${params}`);
         return text(data);
       } catch (e) {
         return err(String(e));

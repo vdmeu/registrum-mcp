@@ -245,6 +245,64 @@ describe("get_psc tool", () => {
   });
 });
 
+// ─── get_psc_chain ────────────────────────────────────────────────────────────
+
+describe("get_psc_chain tool", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("fetches /company/{number}/psc/chain without max_depth by default", async () => {
+    const payload = { company_number: "12345678", pscs: [], chain_metadata: { companies_resolved: 1 } };
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(payload),
+    } as Response);
+
+    const client = await makeClient();
+    const result = await client.callTool({
+      name: "get_psc_chain",
+      arguments: { company_number: "12345678" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const url = (spy.mock.calls[0] as unknown[])[0] as string;
+    expect(url).toBe(`${API_BASE}/company/12345678/psc/chain`);
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    expect(JSON.parse(text)).toEqual(payload);
+  });
+
+  it("appends ?max_depth=3 when max_depth is provided", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ pscs: [] }),
+    } as Response);
+
+    const client = await makeClient();
+    await client.callTool({
+      name: "get_psc_chain",
+      arguments: { company_number: "12345678", max_depth: 3 },
+    });
+
+    const url = (spy.mock.calls[0] as unknown[])[0] as string;
+    expect(url).toBe(`${API_BASE}/company/12345678/psc/chain?max_depth=3`);
+  });
+
+  it("returns isError on API failure", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: () => Promise.resolve("Not found"),
+    } as Response);
+
+    const client = await makeClient();
+    const result = await client.callTool({
+      name: "get_psc_chain",
+      arguments: { company_number: "99999999" },
+    });
+
+    expect(result.isError).toBe(true);
+  });
+});
+
 // ─── get_network ──────────────────────────────────────────────────────────────
 
 describe("get_network tool", () => {
