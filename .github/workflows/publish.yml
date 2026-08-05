@@ -1,0 +1,54 @@
+name: Publish to npm
+
+# Trusted Publishing (OIDC) - no NPM_TOKEN, nothing to expire, no 2FA prompt.
+# npm mints a short-lived credential from GitHub's OIDC identity and verifies
+# this exact repo + workflow, so there is no long-lived secret to leak or renew.
+#
+# This exists because the previous setup had a token that silently expired
+# ~2026-06-04 and only surfaced two months later as an unexplained 401, then a
+# 403 demanding an OTP. Tokens that expire quietly are the failure mode; this
+# removes them.
+#
+# One-time setup on npmjs.com (already done if publishes are working):
+#   Package -> Settings -> Trusted Publisher -> GitHub Actions
+#   Repository: vdmeu/registrum-mcp   Workflow: publish.yml
+#
+# Run it with:  gh workflow run publish.yml --repo vdmeu/registrum-mcp
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for OIDC. Without it npm falls back to looking for a token
+      # and the publish fails with a confusing auth error.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing needs npm >= 11.5.1; the version bundled with the
+      # runner's Node is older, so upgrade explicitly rather than hope.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
+      - run: npm ci
+      - run: npm run build
+
+      # Guards that the published artifact is sane: server.json/package.json
+      # version sync, mcpName matching, and every signup link carrying a utm
+      # tag. prepublishOnly runs these too, but failing here is cheaper.
+      - run: npm test
+
+      - name: Publish
+        run: npm publish --access public
