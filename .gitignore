@@ -3,3 +3,7 @@ dist/
 *.tsbuildinfo
 .mcpregistry_github_token
 .mcpregistry_registry_token
+
+# mcp-publisher CLI binary (downloaded tool, not source)
+mcp-publisher.exe
+mcp-publisher

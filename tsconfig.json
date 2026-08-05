@@ -13,5 +13,7 @@
     "sourceMap": true
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  // Tests are run from source by vitest and must not be compiled into dist -
+  // they were being published to npm as ~30kB of dead weight in every install.
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
