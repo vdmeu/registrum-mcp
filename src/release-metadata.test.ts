@@ -82,3 +82,49 @@ describe("signup links are attributable", () => {
     expect(env.description).toContain("utm_source=mcp");
   });
 });
+
+/**
+ * Per Eugene, 2026-08-05: "all new features need to show here". The API grew
+ * /compliance (the ECCTA differentiator, hard 18 Nov 2026 deadline) and
+ * /kyb-report, and neither reached this package - developers discovering us
+ * through MCP simply could not see them.
+ *
+ * These guards make that mechanical rather than remembered.
+ */
+describe("the package reflects what the API can actually do", () => {
+  const serverSrc = readFileSync(path.join(root, "src/server.ts"), "utf-8");
+
+  it("reports its real version to MCP clients, not a hardcoded one", () => {
+    // VERSION sat at "1.0.0" while the package shipped 1.2.1, so every client
+    // was told the wrong version - the same silent drift as server.json.
+    const hardcoded = serverSrc.match(/const VERSION\s*=\s*["']([\d.]+)["']/);
+    expect(
+      hardcoded,
+      "VERSION must be derived from package.json, not written as a literal"
+    ).toBeNull();
+  });
+
+  it("identifies itself with a User-Agent so its usage is attributable", () => {
+    // Without this the API cannot distinguish MCP-driven calls from direct
+    // ones, which is why MCP adoption was invisible despite 210 downloads/mo.
+    expect(serverSrc).toMatch(/["']User-Agent["']\s*:/);
+  });
+
+  it("exposes a tool for every company endpoint the API offers", () => {
+    // Endpoints deliberately not surfaced go here, with a reason - so a
+    // decision to omit is explicit rather than an oversight.
+    const waived: Record<string, string> = {
+      "kyb-report": "composite report; the underlying endpoints are each exposed",
+    };
+    const apiEndpoints = ["compliance", "directors", "financials", "network", "psc", "psc/chain"];
+    const missing = apiEndpoints.filter((e) => {
+      if (waived[e]) return false;
+      const slug = e.replace("/", "_");
+      return !serverSrc.includes(`"get_${slug}"`);
+    });
+    expect(
+      missing,
+      `API endpoints with no MCP tool: ${missing.join(", ")}. Add a tool, or waive it with a reason.`
+    ).toEqual([]);
+  });
+});

@@ -39,8 +39,22 @@ describe("callApi", () => {
     expect(result).toEqual({ name: "Tesco PLC" });
     expect(spy).toHaveBeenCalledWith(
       `${API_BASE}/company/00445790`,
-      expect.objectContaining({ headers: { "X-API-Key": "reg_test_key" } })
+      expect.objectContaining({
+        headers: expect.objectContaining({ "X-API-Key": "reg_test_key" }),
+      })
     );
+  });
+
+  it("identifies itself with a versioned User-Agent so usage is attributable", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({}),
+    } as Response);
+
+    await callApi("/company/00445790", "reg_test_key");
+
+    const headers = (spy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers["User-Agent"]).toMatch(/^@registrum\/mcp\/\d+\.\d+\.\d+/);
   });
 
   it("throws an error with status code when response is not ok", async () => {

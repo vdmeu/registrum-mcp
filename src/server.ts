@@ -1,8 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { VERSION, USER_AGENT } from "./version.js";
 
 export const API_BASE = "https://api.registrum.co.uk/v1";
-const VERSION = "1.0.0";
 
 export async function callApi(
   path: string,
@@ -15,7 +15,7 @@ export async function callApi(
     );
   }
   const res = await fetch(`${baseUrl}${path}`, {
-    headers: { "X-API-Key": apiKey },
+    headers: { "X-API-Key": apiKey, "User-Agent": USER_AGENT },
   });
   if (!res.ok) {
     const body = await res.text();
@@ -51,8 +51,8 @@ export function createServer(
         "Use these tools to look up UK companies registered at Companies House. " +
         "Company numbers are zero-padded 8-digit strings (e.g. '00445790' for Tesco PLC). " +
         "When a user gives you a company name, use search_company first to find the number, " +
-        "then use get_company, get_financials, get_directors, get_psc, get_psc_chain, or get_network as needed. " +
-        "Use get_psc for a flat view of who controls a company. " +
+        "then use get_company, get_financials, get_directors, get_psc, get_psc_chain, get_compliance, or get_network as needed. " +
+        "Use get_psc for a flat view of who controls a company. Use get_compliance for ECCTA identity-verification status - note 'pending' means the deadline has not passed and is not a failure. " +
         "Use get_psc_chain to trace corporate ownership upward and find the ultimate beneficial owners (UBOs) " +
         "— it follows corporate entity PSCs recursively until reaching natural persons or foreign entities.",
     }
@@ -167,6 +167,39 @@ export function createServer(
     async ({ company_number }) => {
       try {
         const data = await api(`/company/${company_number}/directors`);
+        return text(data);
+      } catch (e) {
+        return err(String(e));
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_compliance",
+    {
+      title: "Check ECCTA identity-verification compliance",
+      description:
+        "Check a UK company's ECCTA identity-verification status - who has verified their " +
+        "identity with Companies House, who is still pending, and who is overdue. " +
+        "The Economic Crime and Corporate Transparency Act requires every director and PSC to " +
+        "verify their identity; enforcement begins 18 November 2026, after which unverified " +
+        "officers can block filings. " +
+        "Returns per-company counts (directors_total, directors_verified, directors_pending, " +
+        "directors_overdue) and the same for PSCs, plus unverified_persons with each person's " +
+        "name, role, status and their individual deadline. " +
+        "IMPORTANT: 'pending' means the deadline has not yet passed - it is NOT a failure and " +
+        "must not be reported as one. Only 'overdue' means a deadline was missed. " +
+        "Requires a Pro plan or above. Cached for 24 hours.",
+      inputSchema: {
+        company_number: z
+          .string()
+          .regex(/^[A-Z0-9]{1,8}$/)
+          .describe("Companies House company number, e.g. '00445790' for Tesco PLC"),
+      },
+    },
+    async ({ company_number }) => {
+      try {
+        const data = await api(`/company/${company_number}/compliance`);
         return text(data);
       } catch (e) {
         return err(String(e));
