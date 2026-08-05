@@ -26,6 +26,17 @@ describe("release metadata stays in step", () => {
     expect(pkg.mcpName).toBe(server.name);
   });
 
+  it("package.json repository matches server.json, and the real repo", () => {
+    // Trusted publishing signs a provenance statement naming the repo the build
+    // actually ran in. If package.json disagrees, npm rejects the publish with
+    // E422 "Failed to validate repository information". package.json carried a
+    // stale username (eugenemerwe) long after the repo moved to vdmeu.
+    const normalise = (u: string) =>
+      u.replace(/^git\+/, "").replace(/\.git$/, "").toLowerCase();
+    expect(normalise(pkg.repository.url)).toBe(normalise(server.repository.url));
+    expect(normalise(pkg.repository.url)).toBe("https://github.com/vdmeu/registrum-mcp");
+  });
+
   it("the npm package entry inside server.json matches too", () => {
     const npmPkg = server.packages.find(
       (p: { registryType: string }) => p.registryType === "npm"
