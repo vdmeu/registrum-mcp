@@ -20,6 +20,12 @@ describe("release metadata stays in step", () => {
     expect(server.version).toBe(pkg.version);
   });
 
+  it("package.json mcpName matches the registry server name", () => {
+    // The registry validates the published tarball against this. A mismatch
+    // fails the publish with "Registry validation failed for package".
+    expect(pkg.mcpName).toBe(server.name);
+  });
+
   it("the npm package entry inside server.json matches too", () => {
     const npmPkg = server.packages.find(
       (p: { registryType: string }) => p.registryType === "npm"
