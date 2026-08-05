@@ -3,10 +3,13 @@
 
 name: Registrum — Companies House API
 description: >
-  Search UK companies, retrieve enriched profiles, structured financial data
-  (parsed from iXBRL filings), director listings with full appointment history,
-  and corporate director network graphs — all in one MCP server backed by the
-  Registrum API.
+  UK Companies House data without the plumbing. Search companies, pull enriched
+  profiles, structured financials parsed from iXBRL filings, directors with full
+  appointment history, PSC registers with control types decoded, ownership chains
+  traced to ultimate beneficial owners, ECCTA compliance and identity-verification status ahead
+  of the 18 November 2026 deadline, and director-network graphs. No Companies
+  House developer key, no rate-limit handling, no iXBRL parsing - one Registrum
+  API key.
 
 startCommand:
   type: stdio
@@ -15,7 +18,7 @@ startCommand:
     properties:
       apiKey:
         type: string
-        description: Your Registrum API key (get one free at registrum.co.uk)
+        description: Your Registrum API key (get one free at registrum.co.uk/?utm_source=mcp&utm_campaign=smithery)
     required:
       - apiKey
   commandFunction: |-
