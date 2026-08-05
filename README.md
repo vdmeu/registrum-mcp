@@ -28,7 +28,7 @@ Add to `~/.claude/claude_desktop_config.json`:
 }
 ```
 
-Get a free API key at [registrum.co.uk](https://registrum.co.uk) (50 calls/month free).
+Get a free API key at [registrum.co.uk](https://registrum.co.uk/?utm_source=mcp&utm_campaign=readme) (50 calls/month free).
 
 ### Cursor
 

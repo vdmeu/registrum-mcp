@@ -6,19 +6,19 @@
     "url": "https://github.com/vdmeu/registrum-mcp",
     "source": "github"
   },
-  "version": "1.0.2",
+  "version": "1.2.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@registrum/mcp",
-      "version": "1.0.2",
+      "version": "1.2.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "REGISTRUM_API_KEY",
-          "description": "Your Registrum API key. Get a free key at https://registrum.co.uk (50 calls/month free).",
+          "description": "Your Registrum API key. Get a free key at https://registrum.co.uk/?utm_source=mcp&utm_campaign=registry (50 calls/month free).",
           "isRequired": true,
           "format": "string",
           "isSecret": true

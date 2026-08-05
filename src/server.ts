@@ -11,7 +11,7 @@ export async function callApi(
 ): Promise<unknown> {
   if (!apiKey) {
     throw new Error(
-      "REGISTRUM_API_KEY is not set. Get a free key at https://registrum.co.uk and set it in your MCP client config."
+      "REGISTRUM_API_KEY is not set. Get a free key at https://registrum.co.uk/?utm_source=mcp&utm_campaign=server and set it in your MCP client config."
     );
   }
   const res = await fetch(`${baseUrl}${path}`, {
