@@ -57,5 +57,23 @@ jobs:
       # tag. prepublishOnly runs these too, but failing here is cheaper.
       - run: npm test
 
-      - name: Publish
+      - name: Publish to npm
         run: npm publish --access public
+
+      # The MCP registry is a second, separate publish - npm hosts the artifact,
+      # the registry only hosts metadata pointing at it. Keeping them in one
+      # workflow is what stops server.json drifting behind npm again (it sat at
+      # v1.0.2 against npm's v1.2.0 for five months).
+      #
+      # github-oidc uses the same short-lived identity as the npm step, so there
+      # is no device code to enter. Doing this by hand meant re-authenticating
+      # every time, because the registry JWT expires in minutes.
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz"             | tar xz mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/
+
+      - name: Publish to the MCP registry
+        run: |
+          mcp-publisher login github-oidc
+          mcp-publisher publish
