@@ -1,18 +1,41 @@
 # Registrum MCP Server
 
-**No Companies House API key needed.** One Registrum API key gives your AI agent enriched, cached UK company data — structured financials, director networks, and company profiles — directly inside Claude, Cursor, and any MCP-compatible client.
+**UK company data in your AI agent — without building Companies House plumbing.**
 
-Unlike raw Companies House API wrappers that require you to register at the CH developer portal and manage your own rate limits, Registrum handles all of that for you: iXBRL filings parsed into clean JSON, 24h/7d caching, and circuit-breaker resilience on CH outages.
+One API key. No Companies House developer account, no rate-limit handling, no
+iXBRL parsing. Works in Claude Desktop, Claude Code, Cursor, and any
+MCP-compatible client.
 
-**5 tools, zero boilerplate.** Search companies, pull structured financials, list directors, and map corporate networks.
+```bash
+npx -y @registrum/mcp
+```
 
 ---
 
-## Installation
+## Why this instead of the Companies House API directly
 
-### Claude Desktop
+Companies House publishes the raw register for free, and you can absolutely
+call it yourself. What you then own is the plumbing:
 
-Add to `~/.claude/claude_desktop_config.json`:
+| Doing it yourself | With Registrum |
+|---|---|
+| Register for a CH developer key, manage OAuth | One `REGISTRUM_API_KEY` |
+| 600 requests/5min, and you handle the 429s | Server-side throttling on a higher negotiated budget |
+| Accounts arrive as iXBRL documents you must parse | `get_financials` returns turnover, net assets, profit/loss as numbers |
+| PSC control types are raw codes | Decoded to plain English |
+| Ownership chains: recurse yourself, handle cycles | `get_psc_chain` returns the resolved tree with termination reasons |
+| Director networks: N+1 queries across appointments | `get_network` traverses to depth 2 |
+| Retry, cache, and survive CH outages yourself | 24h/7d caching, circuit breaker, stale-while-revalidate |
+
+Other Companies House MCP servers make you bring your own CH key and hand back
+the raw response. This one does the enrichment.
+
+---
+
+## Install
+
+**Claude Desktop** — `~/.claude/claude_desktop_config.json`
+**Cursor** — `.cursor/mcp.json` (per project) or `~/.cursor/mcp.json` (global)
 
 ```json
 {
@@ -20,62 +43,74 @@ Add to `~/.claude/claude_desktop_config.json`:
     "registrum": {
       "command": "npx",
       "args": ["-y", "@registrum/mcp"],
-      "env": {
-        "REGISTRUM_API_KEY": "reg_live_..."
-      }
+      "env": { "REGISTRUM_API_KEY": "reg_live_..." }
     }
   }
 }
 ```
 
-Get a free API key at [registrum.co.uk](https://registrum.co.uk/?utm_source=mcp&utm_campaign=readme) (50 calls/month free).
-
-### Cursor
-
-Add to `.cursor/mcp.json` in your project, or to `~/.cursor/mcp.json` globally — same format as above.
+[Get a free key](https://registrum.co.uk/?utm_source=mcp&utm_campaign=readme) — 50 calls/month, no card.
 
 ---
 
 ## Tools
 
-| Tool | Description |
-|------|-------------|
-| `search_company` | Search for UK companies by name |
-| `get_company` | Enriched company profile (age, overdue flags, SIC descriptions) |
-| `get_financials` | Structured P&L + balance sheet from iXBRL filings |
-| `get_directors` | Directors with full appointment history across all companies |
-| `get_network` | Corporate network via shared director connections |
+| Tool | What you get |
+|---|---|
+| `search_company` | Find a company by name → company number |
+| `get_company` | Profile: status, age, SIC descriptions, overdue flags |
+| `get_financials` | Turnover, net assets, profit/loss, employees — parsed from iXBRL, in GBP |
+| `get_directors` | Current board with appointment history across all their companies |
+| `get_psc` | Persons with Significant Control, control types in plain English |
+| `get_psc_chain` | Ownership traversed to ultimate beneficial owners, with termination reasons |
+| `get_compliance` | **ECCTA identity-verification status** — who has verified, who is pending, who is overdue |
+| `get_network` | Companies connected by shared directors, to depth 2 |
+
+### On `get_compliance`
+
+The Economic Crime and Corporate Transparency Act requires every UK director
+and PSC to verify their identity with Companies House. **Enforcement begins
+18 November 2026**, after which unverified officers can block filings.
+
+The tool returns verified / pending / overdue counts plus each unverified
+person and their individual deadline. It deliberately distinguishes **pending**
+(deadline not yet reached — not a failure) from **overdue** (missed). Treating
+those as the same thing is the single easiest way to report a compliant company
+as non-compliant.
 
 ---
 
 ## Example prompts
 
-> "Who are the directors of Tesco PLC and what other companies are they associated with?"
+> "Is Tesco PLC compliant with ECCTA director verification, and who still needs to verify?"
 
-> "Get the latest financials for company 00445790"
+> "Pull the last filed financials for 00445790 and tell me if turnover grew."
 
-> "Search for companies named 'Rolls-Royce' and show me their status"
+> "Who ultimately owns Rolls-Royce Holdings? Trace the ownership chain."
 
-> "Map the director network for Barratt Developments to depth 2"
+> "Which companies share directors with Barratt Developments?"
+
+> "Search for 'Monzo' and show me status, incorporation date and directors."
 
 ---
 
 ## Plans
 
-| Plan | Price | Calls/month |
-|------|-------|------------|
-| Free | £0 | 50 |
-| Pro | £49/mo | 2,000 |
-| Enterprise | £149/mo | 10,000 |
+Free tier is 50 calls/month with every core endpoint. Paid tiers add volume,
+PSC chain traversal and the ECCTA compliance endpoint.
 
-[See pricing →](https://registrum.co.uk/#pricing)
+Prices and quotas are served live from [`GET /v1/plans`](https://api.registrum.co.uk/v1/plans) —
+that endpoint is the source of truth, so this README does not duplicate the
+numbers and cannot go stale against them. Human-readable version at
+[registrum.co.uk](https://registrum.co.uk/?utm_source=mcp&utm_campaign=readme#pricing).
 
 ---
 
-## API reference
+## Notes
 
-Full API docs at [api.registrum.co.uk/docs](https://api.registrum.co.uk/docs)
+- Company numbers are zero-padded 8-character strings: `00445790`, `SC000268`.
+- Responses are JSON, cached server-side (24h profiles/directors, 7d financials).
+- Every call sends `User-Agent: @registrum/mcp/<version>` so we can see which
+  features developers actually use. No telemetry runs on your machine.
 
-## Support
-
-[support@registrum.co.uk](mailto:support@registrum.co.uk)
+[API reference](https://api.registrum.co.uk/docs) · [Issues](https://github.com/vdmeu/registrum-mcp/issues) · [support@registrum.co.uk](mailto:support@registrum.co.uk)
