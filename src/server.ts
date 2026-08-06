@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { VERSION, USER_AGENT } from "./version.js";
 
@@ -37,26 +37,88 @@ function err(message: string) {
   };
 }
 
-export function createServer(
-  apiKey: string,
-  baseUrl: string = API_BASE
-): McpServer {
-  const api = (path: string) => callApi(path, apiKey, baseUrl);
+/**
+ * Every tool this server exposes, in registration order.
+ *
+ * Exported because more than one surface has to agree on it: the stdio package,
+ * the hosted anonymous endpoint, and the drift test that asserts the two match.
+ * The MCP README advertised five tools while the server registered eight for
+ * five months - a list nobody could enumerate programmatically is a list that
+ * goes stale.
+ */
+export const TOOL_NAMES = [
+  "search_company",
+  "get_company",
+  "get_financials",
+  "get_directors",
+  "get_compliance",
+  "get_psc",
+  "get_psc_chain",
+  "get_network",
+] as const;
 
-  const server = new McpServer(
-    { name: "registrum", version: VERSION },
-    {
-      capabilities: { tools: {} },
-      instructions:
-        "Use these tools to look up UK companies registered at Companies House. " +
-        "Company numbers are zero-padded 8-digit strings (e.g. '00445790' for Tesco PLC). " +
-        "When a user gives you a company name, use search_company first to find the number, " +
-        "then use get_company, get_financials, get_directors, get_psc, get_psc_chain, get_compliance, or get_network as needed. " +
-        "Use get_psc for a flat view of who controls a company. Use get_compliance for ECCTA identity-verification status - note 'pending' means the deadline has not passed and is not a failure. " +
-        "Use get_psc_chain to trace corporate ownership upward and find the ultimate beneficial owners (UBOs) " +
-        "— it follows corporate entity PSCs recursively until reaching natural persons or foreign entities.",
-    }
+export type ToolName = (typeof TOOL_NAMES)[number];
+
+/**
+ * Called before a tool touches the API. Return a string to refuse the call with
+ * that message; return null to allow it.
+ *
+ * This is how the hosted anonymous endpoint enforces per-tool daily caps
+ * without the tool definitions knowing anything about IPs, Supabase or quotas.
+ * The stdio package passes no quota at all, so a user with their own API key is
+ * unaffected - their limits are enforced upstream against their own key.
+ *
+ * The refusal is deliberately returned as tool *text* rather than thrown: the
+ * calling model reads it and relays the upgrade path to the user in its own
+ * words, which makes the cap a conversion surface instead of an error.
+ */
+export type QuotaCheck = (tool: ToolName) => Promise<string | null>;
+
+export interface RegisterToolsOptions {
+  apiKey: string;
+  baseUrl?: string;
+  quota?: QuotaCheck;
+}
+
+export const SERVER_INSTRUCTIONS =
+  "Use these tools to look up UK companies registered at Companies House. " +
+  "Company numbers are zero-padded 8-digit strings (e.g. '00445790' for Tesco PLC). " +
+  "When a user gives you a company name, use search_company first to find the number, " +
+  "then use get_company, get_financials, get_directors, get_psc, get_psc_chain, get_compliance, or get_network as needed. " +
+  "Use get_psc for a flat view of who controls a company. Use get_compliance for ECCTA identity-verification status - note 'pending' means the deadline has not passed and is not a failure. " +
+  "Use get_psc_chain to trace corporate ownership upward and find the ultimate beneficial owners (UBOs) " +
+  "- it follows corporate entity PSCs recursively until reaching natural persons or foreign entities.";
+
+const companyNumber = z
+  .string()
+  .regex(/^[A-Z0-9]{1,8}$/, "Must be 1-8 alphanumeric characters")
+  .describe(
+    "Companies House company number, e.g. '00445790' for Tesco PLC. " +
+      "Numeric-only numbers should be zero-padded to 8 digits."
   );
+
+/**
+ * Registers all eight tools on a server instance.
+ *
+ * Split out of createServer so the hosted HTTP endpoint can reuse the exact
+ * same tool definitions. `createMcpHandler` takes a factory callback rather
+ * than a server instance, so without this seam the only way to host these tools
+ * would be to copy them into the website repo - which is precisely the
+ * copy-drifts-from-source failure this codebase keeps paying for.
+ */
+export function registerTools(server: McpServer, options: RegisterToolsOptions): McpServer {
+  const { apiKey, baseUrl = API_BASE, quota } = options;
+
+  /** Runs the quota gate, then the call. Every tool body goes through this. */
+  const run = async (tool: ToolName, path: string) => {
+    try {
+      const denial = await quota?.(tool);
+      if (denial) return err(denial);
+      return text(await callApi(path, apiKey, baseUrl));
+    } catch (e) {
+      return err(String(e));
+    }
+  };
 
   server.registerTool(
     "search_company",
@@ -66,7 +128,7 @@ export function createServer(
         "Search for UK companies by name. Returns a list of matching companies with " +
         "their company number, status, type, and registered address. Use this first " +
         "when you only have a company name and need its company number.",
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).describe("Company name or keywords to search for"),
         limit: z
           .number()
@@ -75,17 +137,12 @@ export function createServer(
           .max(20)
           .optional()
           .describe("Maximum number of results to return (default 10)"),
-      },
+      }),
     },
     async ({ query, limit }) => {
-      try {
-        const params = new URLSearchParams({ q: query });
-        if (limit) params.set("limit", String(limit));
-        const data = await api(`/search?${params}`);
-        return text(data);
-      } catch (e) {
-        return err(String(e));
-      }
+      const params = new URLSearchParams({ q: query });
+      if (limit) params.set("limit", String(limit));
+      return run("search_company", `/search?${params}`);
     }
   );
 
@@ -99,24 +156,9 @@ export function createServer(
         "with descriptions, accounts status, confirmation statement status, and derived " +
         "fields like company_age_years and accounts.overdue that are not available from " +
         "the raw Companies House API.",
-      inputSchema: {
-        company_number: z
-          .string()
-          .regex(/^[A-Z0-9]{1,8}$/, "Must be 1–8 alphanumeric characters")
-          .describe(
-            "Companies House company number, e.g. '00445790' for Tesco PLC. " +
-            "Numeric-only numbers should be zero-padded to 8 digits."
-          ),
-      },
+      inputSchema: z.object({ company_number: companyNumber }),
     },
-    async ({ company_number }) => {
-      try {
-        const data = await api(`/company/${company_number}`);
-        return text(data);
-      } catch (e) {
-        return err(String(e));
-      }
-    }
+    async ({ company_number }) => run("get_company", `/company/${company_number}`)
   );
 
   server.registerTool(
@@ -131,21 +173,9 @@ export function createServer(
         "Also includes accounts type (full/abbreviated/micro/dormant) and a data_quality " +
         "block indicating which fields were extracted and which were absent from the filing. " +
         "Cached for 7 days.",
-      inputSchema: {
-        company_number: z
-          .string()
-          .regex(/^[A-Z0-9]{1,8}$/)
-          .describe("Companies House company number, e.g. '00445790' for Tesco PLC"),
-      },
+      inputSchema: z.object({ company_number: companyNumber }),
     },
-    async ({ company_number }) => {
-      try {
-        const data = await api(`/company/${company_number}/financials`);
-        return text(data);
-      } catch (e) {
-        return err(String(e));
-      }
-    }
+    async ({ company_number }) => run("get_financials", `/company/${company_number}/financials`)
   );
 
   server.registerTool(
@@ -157,21 +187,9 @@ export function createServer(
         "name, role, appointment date, resignation date (if applicable), nationality, " +
         "country of residence, and a list of other companies they serve or have served as " +
         "director. This gives you a full picture of a director's corporate history in one call.",
-      inputSchema: {
-        company_number: z
-          .string()
-          .regex(/^[A-Z0-9]{1,8}$/)
-          .describe("Companies House company number, e.g. '00445790' for Tesco PLC"),
-      },
+      inputSchema: z.object({ company_number: companyNumber }),
     },
-    async ({ company_number }) => {
-      try {
-        const data = await api(`/company/${company_number}/directors`);
-        return text(data);
-      } catch (e) {
-        return err(String(e));
-      }
-    }
+    async ({ company_number }) => run("get_directors", `/company/${company_number}/directors`)
   );
 
   server.registerTool(
@@ -190,21 +208,9 @@ export function createServer(
         "IMPORTANT: 'pending' means the deadline has not yet passed - it is NOT a failure and " +
         "must not be reported as one. Only 'overdue' means a deadline was missed. " +
         "Requires a Pro plan or above. Cached for 24 hours.",
-      inputSchema: {
-        company_number: z
-          .string()
-          .regex(/^[A-Z0-9]{1,8}$/)
-          .describe("Companies House company number, e.g. '00445790' for Tesco PLC"),
-      },
+      inputSchema: z.object({ company_number: companyNumber }),
     },
-    async ({ company_number }) => {
-      try {
-        const data = await api(`/company/${company_number}/compliance`);
-        return text(data);
-      } catch (e) {
-        return err(String(e));
-      }
-    }
+    async ({ company_number }) => run("get_compliance", `/company/${company_number}/compliance`)
   );
 
   server.registerTool(
@@ -219,21 +225,9 @@ export function createServer(
         "instead of raw codes). Corporate entity PSCs include their company number for " +
         "ownership chain traversal. Also detects PSC exemptions for listed PLCs. " +
         "Cached for 24 hours.",
-      inputSchema: {
-        company_number: z
-          .string()
-          .regex(/^[A-Z0-9]{1,8}$/)
-          .describe("Companies House company number, e.g. '00445790' for Tesco PLC"),
-      },
+      inputSchema: z.object({ company_number: companyNumber }),
     },
-    async ({ company_number }) => {
-      try {
-        const data = await api(`/company/${company_number}/psc`);
-        return text(data);
-      } catch (e) {
-        return err(String(e));
-      }
-    }
+    async ({ company_number }) => run("get_psc", `/company/${company_number}/psc`)
   );
 
   server.registerTool(
@@ -242,18 +236,15 @@ export function createServer(
       title: "Resolve PSC ownership chain to find ultimate beneficial owners",
       description:
         "Trace the full ownership chain for a UK company by recursively following corporate " +
-        "entity PSCs. Returns a tree showing who ultimately controls the company — natural persons " +
-        "(UBOs), foreign entities, or legal persons — along with why each branch terminated. " +
+        "entity PSCs. Returns a tree showing who ultimately controls the company - natural persons " +
+        "(UBOs), foreign entities, or legal persons - along with why each branch terminated. " +
         "Each node has a terminal_reason: natural_person, foreign_entity, legal_person, " +
         "super_secure, depth_limit, not_found, cycle_detected, or psc_exempt. " +
         "chain_metadata reports how many companies were resolved and the total API credit cost. " +
         "Use this for KYB (Know Your Business) checks, AML screening, or any task requiring " +
         "beneficial ownership beyond the immediate PSC layer.",
-      inputSchema: {
-        company_number: z
-          .string()
-          .regex(/^[A-Z0-9]{1,8}$/)
-          .describe("Companies House company number, e.g. '12345678'"),
+      inputSchema: z.object({
+        company_number: companyNumber,
         max_depth: z
           .number()
           .int()
@@ -262,19 +253,15 @@ export function createServer(
           .optional()
           .describe(
             "Maximum chain depth to traverse (1-10, default 5). " +
-            "Each level costs 1 upstream API call per corporate entity found."
+              "Each level costs 1 upstream API call per corporate entity found."
           ),
-      },
+      }),
     },
-    async ({ company_number, max_depth }) => {
-      try {
-        const params = max_depth ? `?max_depth=${max_depth}` : "";
-        const data = await api(`/company/${company_number}/psc/chain${params}`);
-        return text(data);
-      } catch (e) {
-        return err(String(e));
-      }
-    }
+    async ({ company_number, max_depth }) =>
+      run(
+        "get_psc_chain",
+        `/company/${company_number}/psc/chain${max_depth ? `?max_depth=${max_depth}` : ""}`
+      )
   );
 
   server.registerTool(
@@ -287,11 +274,8 @@ export function createServer(
         "depth. Each connected company includes its name, number, status, and the directors " +
         "it shares with the focal company. Useful for identifying corporate group structures, " +
         "related party relationships, and director interlocks.",
-      inputSchema: {
-        company_number: z
-          .string()
-          .regex(/^[A-Z0-9]{1,8}$/)
-          .describe("Companies House company number, e.g. '00445790' for Tesco PLC"),
+      inputSchema: z.object({
+        company_number: companyNumber,
         depth: z
           .number()
           .int()
@@ -300,20 +284,22 @@ export function createServer(
           .optional()
           .describe(
             "Traversal depth: 1 = direct connections only, 2 = connections of connections (default 1). " +
-            "Depth 2 can return many results for large companies."
+              "Depth 2 can return many results for large companies."
           ),
-      },
+      }),
     },
-    async ({ company_number, depth }) => {
-      try {
-        const params = depth ? `?depth=${depth}` : "";
-        const data = await api(`/company/${company_number}/network${params}`);
-        return text(data);
-      } catch (e) {
-        return err(String(e));
-      }
-    }
+    async ({ company_number, depth }) =>
+      run("get_network", `/company/${company_number}/network${depth ? `?depth=${depth}` : ""}`)
   );
 
   return server;
+}
+
+/** A stdio-ready server for a single user's own API key. */
+export function createServer(apiKey: string, baseUrl: string = API_BASE): McpServer {
+  const server = new McpServer(
+    { name: "registrum", version: VERSION },
+    { capabilities: { tools: {} }, instructions: SERVER_INSTRUCTIONS }
+  );
+  return registerTools(server, { apiKey, baseUrl });
 }
