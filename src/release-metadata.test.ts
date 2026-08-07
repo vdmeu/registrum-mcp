@@ -128,3 +128,37 @@ describe("the package reflects what the API can actually do", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * Registry-side limits that are only discoverable by failing a publish.
+ *
+ * The MCP registry rejects a server.json whose `description` exceeds 100
+ * characters with a 422, and it does so *after* `npm publish` has already
+ * succeeded in the same workflow job. So the cost of getting this wrong is not
+ * a retry - it is a burnt npm version number, because npm refuses to republish
+ * one. Caught for real on 2.0.1 (2026-08-07).
+ */
+describe("server.json satisfies MCP registry validation", () => {
+  const server = JSON.parse(readFileSync(path.join(root, "server.json"), "utf-8"));
+
+  it("description is within the registry's 100-character limit", () => {
+    expect(
+      server.description.length,
+      `description is ${server.description.length} chars; the registry 422s above 100, ` +
+        `and by then npm has already consumed the version number`
+    ).toBeLessThanOrEqual(100);
+  });
+
+  it("advertises the hosted endpoint as a remote", () => {
+    const urls = (server.remotes ?? []).map((r: { url: string }) => r.url);
+    expect(urls).toContain("https://registrum.co.uk/api/mcp");
+  });
+
+  it("does not mark the API key as required, now that anonymous access exists", () => {
+    for (const pkg of server.packages ?? []) {
+      for (const env of pkg.environmentVariables ?? []) {
+        expect(env.isRequired, `${env.name} must not be required`).toBeFalsy();
+      }
+    }
+  });
+});

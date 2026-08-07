@@ -1,12 +1,12 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.vdmeu/registrum-mcp",
-  "description": "UK Companies House data without an account: search companies, financials parsed from iXBRL, directors, PSC ownership chains to UBOs, ECCTA verification status and director networks. Hosted endpoint needs no API key.",
+  "description": "UK company data: profiles, iXBRL financials, directors, PSC chains, ECCTA. Hosted, no key.",
   "repository": {
     "url": "https://github.com/vdmeu/registrum-mcp",
     "source": "github"
   },
-  "version": "2.0.1",
+  "version": "2.0.2",
   "remotes": [
     {
       "type": "streamable-http",
@@ -17,7 +17,7 @@
     {
       "registryType": "npm",
       "identifier": "@registrum/mcp",
-      "version": "2.0.1",
+      "version": "2.0.2",
       "transport": {
         "type": "stdio"
       },

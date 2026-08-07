@@ -57,8 +57,28 @@ jobs:
       # tag. prepublishOnly runs these too, but failing here is cheaper.
       - run: npm test
 
+      # Tolerate "this version already exists", but nothing else.
+      #
+      # The registry publish below is a separate call that can fail on its own
+      # (it 422s on a description over 100 chars, for instance). When that
+      # happened on 2.0.1 the npm artifact was already live, so the only way to
+      # retry the registry was to burn another version number - npm refuses to
+      # republish one. Now a re-run reaches the registry step regardless, and
+      # any npm failure that is NOT a duplicate still fails the job.
       - name: Publish to npm
-        run: npm publish --access public
+        run: |
+          set -o pipefail
+          if npm publish --access public; then
+            echo "published"
+          else
+            v="$(node -p "require('./package.json').version")"
+            if npm view "@registrum/mcp@$v" version >/dev/null 2>&1; then
+              echo "npm already has $v - continuing so the registry step can run"
+            else
+              echo "npm publish failed for a reason other than a duplicate version" >&2
+              exit 1
+            fi
+          fi
 
       # The MCP registry is a second, separate publish - npm hosts the artifact,
       # the registry only hosts metadata pointing at it. Keeping them in one
