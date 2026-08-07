@@ -85,3 +85,61 @@ describe("capability claims match the tools that actually exist", () => {
     }
   });
 });
+
+/**
+ * The hosted anonymous endpoint is the whole funnel argument (vdmeu/CH-Api#80).
+ *
+ * Every surface here spent five months telling people to install a package and
+ * supply an API key, which is the exact step 74% of signups died at, and it
+ * stayed that way for a full day after the keyless endpoint went live. These
+ * assertions exist so a revert to key-first copy fails a test instead of
+ * quietly costing a month of a pre-registered gate.
+ */
+describe("marketing copy leads with the keyless hosted endpoint", () => {
+  const HOSTED_URL = "https://registrum.co.uk/api/mcp";
+
+  it("README publishes the hosted URL", () => {
+    expect(read("README.md")).toContain(HOSTED_URL);
+  });
+
+  it("README offers the hosted endpoint before the npx install", () => {
+    const readme = read("README.md")!;
+    const npxAt = readme.indexOf("npx");
+    expect(npxAt, "expected the README to still document the npx path somewhere").toBeGreaterThan(-1);
+    expect(
+      readme.indexOf(HOSTED_URL),
+      "the no-signup path must come first - a reader who hits `npx` and an API " +
+        "key requirement before the free option has already been lost"
+    ).toBeLessThan(npxAt);
+  });
+
+  it("README says a key is optional, not required", () => {
+    const readme = read("README.md")!;
+    expect(readme).toMatch(/no signup|no key|without an account/i);
+  });
+
+  it("smithery.yaml declares the hosted transport, not stdio", () => {
+    const yaml = read("smithery.yaml")!;
+    expect(yaml).toContain(HOSTED_URL);
+    expect(
+      yaml,
+      "a stdio listing advertises an install step the hosted endpoint removed"
+    ).not.toMatch(/type:\s*stdio/);
+  });
+
+  it("smithery.yaml requires no apiKey to get started", () => {
+    const yaml = read("smithery.yaml")!;
+    // `required: []` or no required block at all; what must not appear is a
+    // required apiKey, which is what the listing carried until 2026-08-07.
+    expect(yaml).not.toMatch(/required:\s*\n\s*-\s*apiKey/);
+  });
+
+  it("every surface points at the same hosted URL", () => {
+    for (const file of ["README.md", "smithery.yaml"]) {
+      const content = read(file);
+      if (!content || !content.includes("/api/mcp")) continue;
+      const urls = [...content.matchAll(/https:\/\/[^\s"')]+\/api\/mcp/g)].map((m) => m[0]);
+      for (const u of urls) expect(u, `${file} points at ${u}`).toBe(HOSTED_URL);
+    }
+  });
+});

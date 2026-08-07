@@ -2,13 +2,40 @@
 
 **UK company data in your AI agent — without building Companies House plumbing.**
 
-One API key. No Companies House developer account, no rate-limit handling, no
-iXBRL parsing. Works in Claude Desktop, Claude Code, Cursor, and any
-MCP-compatible client.
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-io.github.vdmeu%2Fregistrum--mcp-4F7BFF)](https://registry.modelcontextprotocol.io)
+[![npm](https://img.shields.io/npm/v/@registrum/mcp?color=22D3A0&label=npm)](https://www.npmjs.com/package/@registrum/mcp)
+[![Status](https://img.shields.io/badge/status-live-22D3A0)](https://status.registrum.co.uk)
+[![Docs](https://img.shields.io/badge/API-reference-7A8FAD)](https://api.registrum.co.uk/docs)
 
-```bash
-npx -y @registrum/mcp
+No Companies House developer account, no rate-limit handling, no iXBRL parsing.
+Works in Claude Desktop, Claude Code, Cursor, and any MCP-compatible client.
+
+## Try it now — no signup, no key, no install
+
+Point your client at the hosted endpoint and every tool answers with real data:
+
 ```
+https://registrum.co.uk/api/mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "registrum": {
+      "url": "https://registrum.co.uk/api/mcp"
+    }
+  }
+}
+```
+
+That is the whole setup. Ask it *"Who ultimately owns Rolls-Royce Holdings?"* and
+it will trace the ownership chain.
+
+The free anonymous tier is generous on the everyday tools and deliberately
+small on the expensive ones — a couple of ownership-chain traces and financial
+statements per day, which is enough to see exactly what comes back before you
+decide anything. When you reach a cap, the tool tells you so and points at a
+free key; nothing silently degrades.
 
 ---
 
@@ -19,7 +46,7 @@ call it yourself. What you then own is the plumbing:
 
 | Doing it yourself | With Registrum |
 |---|---|
-| Register for a CH developer key, manage OAuth | One `REGISTRUM_API_KEY` |
+| Register for a CH developer key, manage OAuth | Nothing, or one `REGISTRUM_API_KEY` |
 | 600 requests/5min, and you handle the 429s | Server-side throttling on a higher negotiated budget |
 | Accounts arrive as iXBRL documents you must parse | `get_financials` returns turnover, net assets, profit/loss as numbers |
 | PSC control types are raw codes | Decoded to plain English |
@@ -32,7 +59,10 @@ the raw response. This one does the enrichment.
 
 ---
 
-## Install
+## Running it with your own key
+
+Use a key when you want the anonymous caps lifted, or when you would rather run
+the server locally than call ours.
 
 **Claude Desktop** — `~/.claude/claude_desktop_config.json`
 **Cursor** — `.cursor/mcp.json` (per project) or `~/.cursor/mcp.json` (global)
@@ -49,7 +79,7 @@ the raw response. This one does the enrichment.
 }
 ```
 
-[Get a free key](https://registrum.co.uk/?utm_source=mcp&utm_campaign=readme) — 50 calls/month, no card.
+[Get a free key](https://registrum.co.uk/?utm_source=mcp&utm_campaign=readme) — no card.
 
 ---
 
@@ -96,8 +126,8 @@ as non-compliant.
 
 ## Plans
 
-Free tier is 50 calls/month with every core endpoint. Paid tiers add volume,
-PSC chain traversal and the ECCTA compliance endpoint.
+The anonymous endpoint needs no account at all. A free key raises the caps, and
+paid tiers add volume, PSC chain traversal and the ECCTA compliance endpoint.
 
 Prices and quotas are served live from [`GET /v1/plans`](https://api.registrum.co.uk/v1/plans) —
 that endpoint is the source of truth, so this README does not duplicate the
@@ -110,7 +140,9 @@ numbers and cannot go stale against them. Human-readable version at
 
 - Company numbers are zero-padded 8-character strings: `00445790`, `SC000268`.
 - Responses are JSON, cached server-side (24h profiles/directors, 7d financials).
-- Every call sends `User-Agent: @registrum/mcp/<version>` so we can see which
-  features developers actually use. No telemetry runs on your machine.
+- The hosted endpoint is stateless and anonymous: it stores no account, and rate
+  limiting is keyed on a hash of the calling IP rather than anything about you.
+- The npm package sends `User-Agent: @registrum/mcp/<version>` so we can see
+  which features developers actually use. No telemetry runs on your machine.
 
 [API reference](https://api.registrum.co.uk/docs) · [Issues](https://github.com/vdmeu/registrum-mcp/issues) · [support@registrum.co.uk](mailto:support@registrum.co.uk)

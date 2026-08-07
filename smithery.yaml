@@ -1,29 +1,29 @@
 # Smithery MCP registry configuration
 # https://smithery.ai
+#
+# Declared as a hosted, remote server with NO required configuration. That is
+# the whole point: the anonymous endpoint needs no account, no API key and no
+# local install, which is the step where most people dropped out.
+#
+# The npm/stdio package still exists for anyone who wants their own key or to
+# run the server locally - see README - but it is not what a directory listing
+# should lead with.
 
 name: Registrum — Companies House API
 description: >
-  UK Companies House data without the plumbing. Search companies, pull enriched
-  profiles, structured financials parsed from iXBRL filings, directors with full
-  appointment history, PSC registers with control types decoded, ownership chains
-  traced to ultimate beneficial owners, ECCTA compliance and identity-verification status ahead
-  of the 18 November 2026 deadline, and director-network graphs. No Companies
-  House developer key, no rate-limit handling, no iXBRL parsing - one Registrum
-  API key.
+  UK Companies House data without the plumbing, and without an account. Search
+  companies, pull enriched profiles, structured financials parsed from iXBRL
+  filings, directors with full appointment history, PSC registers with control
+  types decoded, ownership chains traced to ultimate beneficial owners, ECCTA
+  compliance and identity-verification status ahead of the 18 November 2026
+  deadline, and director-network graphs. No Companies House developer key, no
+  rate-limit handling, no iXBRL parsing. Try every tool anonymously; add a free
+  Registrum key only when you want the caps lifted.
 
 startCommand:
-  type: stdio
+  type: http
+  url: https://registrum.co.uk/api/mcp
   configSchema:
     type: object
-    properties:
-      apiKey:
-        type: string
-        description: Your Registrum API key (get one free at registrum.co.uk/?utm_source=mcp&utm_campaign=smithery)
-    required:
-      - apiKey
-  commandFunction: |-
-    (config) => ({
-      command: "npx",
-      args: ["-y", "@registrum/mcp"],
-      env: { REGISTRUM_API_KEY: config.apiKey }
-    })
+    properties: {}
+    required: []

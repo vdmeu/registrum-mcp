@@ -1,12 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.vdmeu/registrum-mcp",
-  "description": "Search UK companies, get financials, directors, and networks via the Registrum Companies House API.",
+  "description": "UK Companies House data without an account: search companies, financials parsed from iXBRL, directors, PSC ownership chains to UBOs, ECCTA verification status and director networks. Hosted endpoint needs no API key.",
   "repository": {
     "url": "https://github.com/vdmeu/registrum-mcp",
     "source": "github"
   },
   "version": "2.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://registrum.co.uk/api/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
@@ -18,8 +24,8 @@
       "environmentVariables": [
         {
           "name": "REGISTRUM_API_KEY",
-          "description": "Your Registrum API key. Get a free key at https://registrum.co.uk/?utm_source=mcp&utm_campaign=registry (50 calls/month free).",
-          "isRequired": true,
+          "description": "Optional. Only needed to lift the anonymous rate caps or to run the server locally against your own key - the hosted endpoint above needs no key at all. Get a free key at https://registrum.co.uk/?utm_source=mcp&utm_campaign=registry",
+          "isRequired": false,
           "format": "string",
           "isSecret": true
         }
