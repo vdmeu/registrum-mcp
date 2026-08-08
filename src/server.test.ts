@@ -99,7 +99,11 @@ describe("search_company tool", () => {
     expect(JSON.parse(text)).toEqual(payload);
   });
 
-  it("includes limit param in the URL when provided", async () => {
+  it("sends limit as items_per_page, the param the API actually declares", async () => {
+    // The API route (routes_search.py) declares `items_per_page`, not `limit`.
+    // FastAPI silently drops unknown query params, so a `limit=5` here was a
+    // no-op and every search silently fell back to the API's default of 20
+    // (vdmeu/registrum-mcp#5).
     const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ results: [] }),
@@ -110,7 +114,8 @@ describe("search_company tool", () => {
 
     const url = (spy.mock.calls[0] as unknown[])[0] as string;
     expect(url).toContain("q=Tesco");
-    expect(url).toContain("limit=5");
+    expect(url).toContain("items_per_page=5");
+    expect(url).not.toContain("limit=5");
   });
 
   it("returns isError on API failure", async () => {

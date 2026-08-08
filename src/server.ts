@@ -136,12 +136,12 @@ export function registerTools(server: McpServer, options: RegisterToolsOptions):
           .min(1)
           .max(20)
           .optional()
-          .describe("Maximum number of results to return (default 10)"),
+          .describe("Maximum number of results to return (default 20)"),
       }),
     },
     async ({ query, limit }) => {
       const params = new URLSearchParams({ q: query });
-      if (limit) params.set("limit", String(limit));
+      if (limit) params.set("items_per_page", String(limit));
       return run("search_company", `/search?${params}`);
     }
   );
