@@ -181,12 +181,18 @@ export function registerTools(server: McpServer, options: RegisterToolsOptions):
   server.registerTool(
     "get_directors",
     {
-      title: "Get company directors",
+      title: "Get company officers (directors and secretaries)",
       description:
-        "Get the current and past directors for a UK company, including each director's " +
-        "name, role, appointment date, resignation date (if applicable), nationality, " +
-        "country of residence, and a list of other companies they serve or have served as " +
-        "director. This gives you a full picture of a director's corporate history in one call.",
+        "Get the current and past officers for a UK company. Despite the tool name, not every " +
+        "entry is a director: the list is the full officer register, so each entry carries an " +
+        "officer_role such as 'director', 'secretary', 'corporate-secretary' or 'llp-member', " +
+        "plus an is_board_director boolean that is false for secretaries. Report each person by " +
+        "their own officer_role - never describe the whole list as directors. " +
+        "Each officer includes name, officer_role, is_board_director, appointment date, " +
+        "resignation date (if applicable), nationality, occupation, month and year of birth, " +
+        "ECCTA verification status, and a list of other companies they are or were appointed to, " +
+        "each with its own officer_role. This gives you a full picture of an officer's corporate " +
+        "history in one call.",
       inputSchema: z.object({ company_number: companyNumber }),
     },
     async ({ company_number }) => run("get_directors", `/company/${company_number}/directors`)

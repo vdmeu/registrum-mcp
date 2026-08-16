@@ -220,6 +220,29 @@ describe("get_directors tool", () => {
     const url = (spy.mock.calls[0] as unknown[])[0] as string;
     expect(url).toBe(`${API_BASE}/company/00445790/directors`);
   });
+
+  /**
+   * The tool description is the only thing the calling model reads before it
+   * summarises the payload, so a wrong description is a wrong answer to the
+   * user. /directors returns the whole officer register - secretaries,
+   * corporate secretaries and LLP members included, flagged by officer_role and
+   * is_board_director - and the description used to promise "other companies
+   * they serve or have served as director", teaching the model the same
+   * every-officer-is-a-director mislabel CH-Api#55 fixed on the API side
+   * (vdmeu/registrum-mcp#16).
+   */
+  it("describes the payload as officer roles, not all directors", async () => {
+    const client = await makeClient();
+    const { tools } = await client.listTools();
+    const description = tools.find((t) => t.name === "get_directors")!.description!;
+
+    expect(description).toContain("officer_role");
+    expect(description).toMatch(/secretar/i);
+    expect(
+      description,
+      "the description must not promise that every entry serves as a director"
+    ).not.toMatch(/\bas (a |an )?director\b/i);
+  });
 });
 
 // ─── get_psc ─────────────────────────────────────────────────────────────────
