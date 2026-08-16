@@ -162,3 +162,76 @@ describe("server.json satisfies MCP registry validation", () => {
     }
   });
 });
+
+/**
+ * Declared dependency floors, not just the lockfile (#14, #7).
+ *
+ * The MCP Marketplace scanner reads `package.json` from the GitHub repo and
+ * resolves each declared range *statically*. Its scan of 2.0.4 listed exactly
+ * `README.md`, `package.json` and `src/*.ts` as scanned_files - no
+ * `package-lock.json`. With no lockfile it can only assume the lowest version a
+ * range admits, so `"vitest": "^3"` reads to it as vitest 3.0.0.
+ *
+ * That is why the 2026-08-08 audit (a68d675) only half-worked. `npm audit fix`
+ * moved the *lockfile* to vitest 3.2.7 and `npm audit` has reported 0
+ * vulnerabilities ever since - but the declared range stayed `^3`, whose floor
+ * of 3.0.0 is still inside both advisories. esbuild cleared in the same commit
+ * precisely because its range was bumped explicitly to `^0.28.1`, putting its
+ * floor on the patched version. Result: the public listing kept showing 2
+ * critical vitest findings, and the score stuck at 5.2 "Moderate Risk".
+ *
+ * So the floor a range admits is a published trust signal in its own right.
+ * Loosening one of these back to a bare major silently re-opens the finding.
+ */
+describe("dependency ranges declare an advisory-clean floor", () => {
+  /** Lowest version a simple npm range admits (`^`/`~`/`>=`/exact). */
+  const minVersion = (range: string): number[] => {
+    const bare = range.replace(/^[\^~]|^>=\s*/, "").trim();
+    const parts = bare.split(".").map((p) => parseInt(p, 10));
+    while (parts.length < 3) parts.push(0); // "^3" admits 3.0.0
+    return parts;
+  };
+
+  const gte = (a: number[], b: number[]) => {
+    for (let i = 0; i < 3; i++) {
+      if (a[i] !== b[i]) return a[i] > b[i];
+    }
+    return true;
+  };
+
+  // Package -> lowest version with no known advisory against it, and why.
+  const safeFloors: Record<string, { floor: string; because: string }> = {
+    vitest: {
+      floor: "3.2.6",
+      because:
+        "GHSA-9crc-q9x8-hgqq (CVE-2025-24964, RCE via the API server) is patched " +
+        "in 3.0.5 and GHSA-5xrq-8626-4rwp (CVE-2026-47429, arbitrary file " +
+        "read/execute via the UI server) in 3.2.6 - both critical",
+    },
+    esbuild: {
+      floor: "0.28.1",
+      because:
+        "GHSA-g7r4-m6w7-qqqr (arbitrary file read via the Windows dev server) " +
+        "and GHSA-gv7w-rqvm-qjhr are both patched in 0.28.1",
+    },
+  };
+
+  const declared: Record<string, string> = {
+    ...(pkg.dependencies ?? {}),
+    ...(pkg.devDependencies ?? {}),
+  };
+
+  for (const [name, { floor, because }] of Object.entries(safeFloors)) {
+    it(`${name} cannot be declared below ${floor}`, () => {
+      const range = declared[name];
+      expect(range, `${name} is no longer a declared dependency`).toBeDefined();
+      expect(
+        gte(minVersion(range), minVersion(floor)),
+        `package.json declares "${name}": "${range}", which admits ` +
+          `${minVersion(range).join(".")}. A scanner that reads only package.json ` +
+          `resolves the range to that floor and reports the advisory as unfixed. ` +
+          `Declare ^${floor} or higher: ${because}.`
+      ).toBe(true);
+    });
+  }
+});
