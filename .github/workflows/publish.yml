@@ -24,7 +24,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       # Required for OIDC. Without it npm falls back to looking for a token
       # and the publish fails with a confusing auth error.
       id-token: write
@@ -97,3 +97,24 @@ jobs:
         run: |
           mcp-publisher login github-oidc
           mcp-publisher publish
+
+      # This repo published tags for every version (v1.0.1 .. v2.0.5) but
+      # never once created a GitHub Release object - a different thing from
+      # a tag, and the thing external directories actually read. Glama's
+      # listing showed "Latest release: v1.0.2" for five versions straight
+      # because of exactly this gap (found 2026-08-28, fixed by hand for
+      # v2.0.5: github.com/vdmeu/registrum-mcp/releases/tag/v2.0.5). This
+      # closes it at the source instead of needing another manual catch-up.
+      - name: Create a GitHub Release for this tag
+        # workflow_dispatch can run on a branch, not just a tag push - only
+        # attempt this when there's an actual tag to attach the release to.
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists - nothing to do."
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --generate-notes --title "$tag"
+          fi
