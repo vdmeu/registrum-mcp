@@ -14,7 +14,11 @@ import { STATE_FILE } from "./login.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OVERVIEW_URL = "https://glama.ai/mcp/servers/vdmeu/registrum-mcp";
-const ADMIN_URL = "https://glama.ai/mcp/servers/vdmeu/registrum-mcp/admin";
+// Verified 2026-08-28, logged in: "Sync Server" lives under the Repository
+// tab specifically, not the bare /admin root (which defaults to /profile
+// and has no sync control at all - /admin/analytics and /admin/dockerfile
+// don't either).
+const ADMIN_URL = "https://glama.ai/mcp/servers/vdmeu/registrum-mcp/admin/repository";
 
 /** Try a list of candidate locators in order; return the first that's visible, or null. */
 async function firstVisible(page, candidates) {

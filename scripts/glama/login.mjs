@@ -19,42 +19,99 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const STATE_DIR = path.join(__dirname, "state");
 export const STATE_FILE = path.join(STATE_DIR, "glama-auth.json");
 
+async function isPastSignInWall(page) {
+  // Only counts as "done" when we're actually BACK on glama.ai past the
+  // wall. Checking pathname alone (as the first version of this script did)
+  // false-positived twice: once on the glama.ai admin URL itself before its
+  // client-side redirect to /sign-up had run, and once mid-flight on
+  // github.com's own login pages (e.g. /login, /sessions/two-factor) - those
+  // paths don't contain "/sign-in" or "/sign-up" either, so a same-domain-only
+  // substring check wrongly treated "still on GitHub, still authenticating"
+  // as "finished". Hostname must be glama.ai too.
+  let url;
+  try {
+    url = new URL(page.url());
+  } catch {
+    return false;
+  }
+  if (url.hostname !== "glama.ai") return false;
+  return !url.pathname.includes("/sign-in") && !url.pathname.includes("/sign-up");
+}
+
+/**
+ * Poll until the page has genuinely settled on glama.ai past the sign-in
+ * wall, requiring several consecutive stable reads rather than one lucky
+ * moment - a multi-page GitHub sign-in (password, 2FA, device approval,
+ * OAuth consent) passes through several transient states before landing.
+ */
+async function waitForRealSignIn(page, { timeoutMs, pollMs = 2000, requiredStableReads = 3 }) {
+  const deadline = Date.now() + timeoutMs;
+  let stableCount = 0;
+  while (Date.now() < deadline) {
+    if (await isPastSignInWall(page)) {
+      stableCount += 1;
+      if (stableCount >= requiredStableReads) return true;
+    } else {
+      stableCount = 0;
+    }
+    await page.waitForTimeout(pollMs);
+  }
+  return false;
+}
+
 async function main() {
   if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
 
-  console.log("Opening a browser window. Sign in to Glama with GitHub, then come back here.");
-  console.log("This window will close itself once you reach a signed-in Glama page.\n");
+  console.log("Opening a browser window. Take your time signing in to Glama with GitHub -");
+  console.log("password, 2FA, device approval, OAuth consent, however many pages it takes.");
+  console.log("This script polls for real completion; it will not move on early.\n");
 
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto("https://glama.ai/mcp/servers/vdmeu/registrum-mcp/admin");
+  await page.waitForLoadState("networkidle");
 
-  // Poll for a sign of being logged in: the admin page stops being a sign-up
-  // wall and starts showing the server's own admin controls (e.g. a "Claim"
-  // or "Sync Server" button, or the account menu). We don't know the exact
-  // DOM until a real session gets there, so this waits generously and lets a
-  // human confirm rather than guessing a brittle selector.
-  console.log("Waiting for you to finish signing in (up to 5 minutes)...");
-  try {
-    await page.waitForURL((url) => !url.pathname.includes("/sign-in") && !url.pathname.includes("/sign-up"), {
-      timeout: 5 * 60 * 1000,
-    });
-  } catch {
-    console.log("Timed out waiting - saving whatever session state exists anyway. Re-run if sync.mjs fails.");
+  if (await isPastSignInWall(page)) {
+    console.log("Already past the sign-in wall - no action needed.");
+  } else {
+    console.log("Waiting for you to finish signing in (up to 10 minutes, checked every 2s)...");
+    const done = await waitForRealSignIn(page, { timeoutMs: 10 * 60 * 1000 });
+    if (!done) {
+      console.log("Timed out waiting - saving whatever session state exists anyway. Re-run if sync.mjs fails.");
+    }
   }
 
-  // Give the post-login redirect a moment to settle before snapshotting cookies.
-  await page.waitForTimeout(2000);
-
   await context.storageState({ path: STATE_FILE });
+
+  // Closed-loop verification: reload the admin page in a FRESH context
+  // using only the just-saved state, the same way sync.mjs will. If that
+  // still lands on the sign-in wall, don't claim success.
+  const verifyContext = await browser.newContext({ storageState: STATE_FILE });
+  const verifyPage = await verifyContext.newPage();
+  await verifyPage.goto("https://glama.ai/mcp/servers/vdmeu/registrum-mcp/admin", { waitUntil: "networkidle" });
+  const stillWalled = !(await isPastSignInWall(verifyPage));
   await browser.close();
 
-  console.log(`\nSaved session to ${STATE_FILE} (gitignored - this is a live login, treat it like a credential).`);
+  if (stillWalled) {
+    console.error(`\nStill not signed in (saved state lands on ${verifyPage.url()}). Nothing saved that would help.`);
+    console.error("Re-run this script and make sure the GitHub sign-in actually completes before the window closes.");
+    process.exit(1);
+  }
+
+  console.log(`\nVerified: the saved session reaches the admin page without a sign-in wall.`);
+  console.log(`Saved to ${STATE_FILE} (gitignored - this is a live login, treat it like a credential).`);
   console.log("Run: node scripts/glama/sync.mjs");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only run when invoked directly - sync.mjs imports STATE_FILE from this
+// module and must not accidentally trigger a second interactive login as a
+// side effect of that import (found 2026-08-28: it did exactly that, and
+// sync.mjs's own console output got interleaved with a second login.mjs run).
+const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
