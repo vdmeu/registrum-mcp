@@ -13,6 +13,12 @@ name: API contract drift
 # items_per_page (registrum-mcp#5):
 #   endpoint - does a tool exist for every endpoint?
 #   parameter - does each tool send names the endpoint actually declares?
+#
+# It also checks a third, unrelated seam that turned out to have the same
+# shape: the public Glama listing (glama.ai) scans our code independently of
+# anything we ship, and can go stale the same way (2026-08-28: it read v1.0.2/
+# 5 tools while the live server shipped v2.0.5/8 tools). scripts/glama/check.mjs
+# needs no login; fixing drift it finds does (scripts/glama/README.md).
 
 on:
   schedule:
@@ -45,8 +51,13 @@ jobs:
         run: node scripts/check-param-drift.mjs 2>&1 | tee -a coverage.txt
         continue-on-error: true
 
+      - name: Check Glama's listing hasn't gone stale against the live server
+        id: glama
+        run: node scripts/glama/check.mjs 2>&1 | tee -a coverage.txt
+        continue-on-error: true
+
       - name: Open an issue when the package has drifted from the API
-        if: (steps.endpoints.outcome == 'failure' || steps.params.outcome == 'failure') && github.event_name != 'pull_request'
+        if: (steps.endpoints.outcome == 'failure' || steps.params.outcome == 'failure' || steps.glama.outcome == 'failure') && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -62,15 +73,15 @@ jobs:
             gh issue create \
               --title "MCP package has drifted from the API contract" \
               --label endpoint-drift \
-              --body "This package and the API no longer agree - either an endpoint has no tool, or a tool sends a parameter name the endpoint does not declare (which FastAPI drops silently, so nobody sees an error).
+              --body "This package and the API no longer agree - either an endpoint has no tool, a tool sends a parameter name the endpoint does not declare (which FastAPI drops silently, so nobody sees an error), or the public Glama listing is scanning a stale version.
 
           \`\`\`
           $(cat coverage.txt)
           \`\`\`
 
-          Fix \`src/server.ts\`, or waive a missing endpoint with a reason in \`WAIVED\` (\`scripts/check-endpoint-coverage.mjs\`). Then release with \`gh workflow run publish.yml\`."
+          Fix \`src/server.ts\`, or waive a missing endpoint with a reason in \`WAIVED\` (\`scripts/check-endpoint-coverage.mjs\`). Then release with \`gh workflow run publish.yml\`. If it's the Glama check: \`node scripts/glama/sync.mjs\` (needs \`node scripts/glama/login.mjs\` once first - see \`scripts/glama/README.md\`)."
           fi
 
       - name: Fail the run so the drift is visible
-        if: steps.endpoints.outcome == 'failure' || steps.params.outcome == 'failure'
+        if: steps.endpoints.outcome == 'failure' || steps.params.outcome == 'failure' || steps.glama.outcome == 'failure'
         run: exit 1

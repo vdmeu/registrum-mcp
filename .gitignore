@@ -4,6 +4,10 @@ dist/
 .mcpregistry_github_token
 .mcpregistry_registry_token
 
+# Saved Playwright login session for scripts/glama/sync.mjs - this is a live
+# credential (session cookies), never commit it.
+scripts/glama/state/
+
 # mcp-publisher CLI binary (downloaded tool, not source)
 mcp-publisher.exe
 mcp-publisher
