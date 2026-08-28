@@ -43,17 +43,23 @@ jobs:
 
       - name: Check every API endpoint has an MCP tool
         id: endpoints
-        run: node scripts/check-endpoint-coverage.mjs 2>&1 | tee coverage.txt
+        run: |
+          set -o pipefail
+          node scripts/check-endpoint-coverage.mjs 2>&1 | tee coverage.txt
         continue-on-error: true
 
       - name: Check every parameter a tool sends is declared by the API
         id: params
-        run: node scripts/check-param-drift.mjs 2>&1 | tee -a coverage.txt
+        run: |
+          set -o pipefail
+          node scripts/check-param-drift.mjs 2>&1 | tee -a coverage.txt
         continue-on-error: true
 
       - name: Check Glama's listing hasn't gone stale against the live server
         id: glama
-        run: node scripts/glama/check.mjs 2>&1 | tee -a coverage.txt
+        run: |
+          set -o pipefail
+          node scripts/glama/check.mjs 2>&1 | tee -a coverage.txt
         continue-on-error: true
 
       - name: Open an issue when the package has drifted from the API
