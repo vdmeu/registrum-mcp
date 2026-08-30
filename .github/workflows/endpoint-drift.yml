@@ -55,6 +55,13 @@ jobs:
           node scripts/check-param-drift.mjs 2>&1 | tee -a coverage.txt
         continue-on-error: true
 
+      - name: Check tool descriptions still describe what the API returns
+        id: descriptions
+        run: |
+          set -o pipefail
+          node scripts/check-description-drift.mjs 2>&1 | tee -a coverage.txt
+        continue-on-error: true
+
       - name: Check Glama's listing hasn't gone stale against the live server
         id: glama
         run: |
@@ -63,7 +70,7 @@ jobs:
         continue-on-error: true
 
       - name: Open an issue when the package has drifted from the API
-        if: (steps.endpoints.outcome == 'failure' || steps.params.outcome == 'failure' || steps.glama.outcome == 'failure') && github.event_name != 'pull_request'
+        if: (steps.endpoints.outcome == 'failure' || steps.params.outcome == 'failure' || steps.descriptions.outcome == 'failure' || steps.glama.outcome == 'failure') && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

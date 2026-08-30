@@ -228,8 +228,15 @@ export function registerTools(server: McpServer, options: RegisterToolsOptions):
         "Returns individuals, corporate entities, and legal persons who own 25%+ of shares, " +
         "hold 25%+ of voting rights, or have significant influence or control. " +
         "Each PSC includes decoded control types in plain English (e.g. 'Owns 25-50% of shares' " +
-        "instead of raw codes). Corporate entity PSCs include their company number for " +
-        "ownership chain traversal. Also detects PSC exemptions for listed PLCs. " +
+        "instead of raw codes). Individual PSCs also carry ECCTA identity verification: " +
+        "verification_status (verified, pending, overdue or unknown), identity_verified, " +
+        "identity_verified_on, and verification_deadline. pending means that person's deadline " +
+        "has not yet passed and is not a compliance failure; unknown means Companies House " +
+        "publishes no record for them, an absence of data rather than a breach. Only overdue " +
+        "means a deadline was missed. " +
+        "Corporate entity PSCs include their company number for " +
+        "ownership chain traversal, and carry none of the verification fields. " +
+        "Also detects PSC exemptions for listed PLCs. " +
         "Cached for 24 hours.",
       inputSchema: z.object({ company_number: companyNumber }),
     },
@@ -245,7 +252,22 @@ export function registerTools(server: McpServer, options: RegisterToolsOptions):
         "entity PSCs. Returns a tree showing who ultimately controls the company - natural persons " +
         "(UBOs), foreign entities, or legal persons - along with why each branch terminated. " +
         "Each node has a terminal_reason: natural_person, foreign_entity, legal_person, " +
-        "super_secure, depth_limit, not_found, cycle_detected, or psc_exempt. " +
+        "super_secure, unverified_registry, unknown_kind, depth_limit, not_found, " +
+        "cycle_detected, or psc_exempt. Two of those are easy to misread: unverified_registry " +
+        "means a registration number was filed but cannot be tied to the Companies House " +
+        "register (a foreign registry, or one we do not recognise), which is a finding about " +
+        "the ownership structure and not an error or an outage; unknown_kind means Companies " +
+        "House returned a PSC type we do not classify, with the raw value in kind_raw. " +
+        "ECCTA identity verification: every individual node, at any depth including the " +
+        "ultimate beneficial owners this chain exists to find, carries verification_status " +
+        "(verified, pending, overdue or unknown), identity_verified (true, false for overdue " +
+        "only, or null otherwise), identity_verified_on, and verification_deadline. " +
+        "IMPORTANT: pending means that person's own deadline has not yet passed - it is not a " +
+        "compliance failure and must not be reported as one. A status of unknown means " +
+        "Companies House publishes no record for them, which is an absence of data rather " +
+        "than a breach. Only overdue means a deadline was missed. Corporate, legal-person and " +
+        "super-secure nodes carry none of these fields, so never describe a company itself as " +
+        "having unverified identity. " +
         "chain_metadata reports how many companies were resolved and the total API credit cost. " +
         "Use this for KYB (Know Your Business) checks, AML screening, or any task requiring " +
         "beneficial ownership beyond the immediate PSC layer.",
