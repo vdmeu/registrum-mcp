@@ -16,7 +16,9 @@ description: >
   filings, directors with full appointment history, PSC registers with control
   types decoded, ownership chains traced to ultimate beneficial owners, ECCTA
   compliance and identity-verification status ahead of the 18 November 2026
-  deadline, and director-network graphs. No Companies House developer key, no
+  deadline, and director-network graphs - or one bundle call that returns
+  profile, compliance, financials, PSCs and directors together, for a single
+  credit instead of five. No Companies House developer key, no
   rate-limit handling, no iXBRL parsing. Try every tool anonymously; add a free
   Registrum key only when you want the caps lifted.
 

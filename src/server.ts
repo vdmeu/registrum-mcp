@@ -55,6 +55,7 @@ export const TOOL_NAMES = [
   "get_psc",
   "get_psc_chain",
   "get_network",
+  "get_bundle",
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -241,6 +242,52 @@ export function registerTools(server: McpServer, options: RegisterToolsOptions):
       inputSchema: z.object({ company_number: companyNumber }),
     },
     async ({ company_number }) => run("get_psc", `/company/${company_number}/psc`)
+  );
+
+  /** The sections /v1/company/{n}/bundle can assemble, in the API's own order.
+   *
+   * A closed enum rather than a free string: the API answers an unknown
+   * section with a 400, and a model that guesses "accounts" should be told the
+   * valid names by the schema instead of spending a call to find out.
+   */
+  const BUNDLE_SECTIONS = ["profile", "compliance", "financials", "psc", "directors"] as const;
+
+  server.registerTool(
+    "get_bundle",
+    {
+      title: "Get a whole company in one request",
+      description:
+        "Get several views of one UK company in a single request: profile, ECCTA compliance, " +
+        "financials, PSCs and directors. Prefer this over calling get_company, get_compliance, " +
+        "get_financials, get_psc and get_directors separately - it returns the same data for " +
+        "one API call and one credit instead of five, and in a single round trip. " +
+        "Pass include to fetch only the sections you need; omit it to get all five. " +
+        "The profile is always returned. " +
+        "Partial results are normal and are not errors: any section can come back null when it " +
+        "is unavailable for that company or not included in the caller's plan - financials are " +
+        "null for a company that has filed no machine-readable accounts, and compliance requires " +
+        "a Pro plan. Report a null section as 'not available', never as a failed lookup or as an " +
+        "absence of the underlying fact. Only a missing company is an error, and that is a 404. " +
+        "Each section carries exactly what its own endpoint returns, including ECCTA " +
+        "verification_status on individuals, so the pending-versus-overdue rules apply here too.",
+      inputSchema: z.object({
+        company_number: companyNumber,
+        include: z
+          .array(z.enum(BUNDLE_SECTIONS))
+          .min(1)
+          .optional()
+          .describe(
+            "Sections to fetch. Omit for all five. Valid values: " +
+              BUNDLE_SECTIONS.join(", ") +
+              ". The profile is always included regardless."
+          ),
+      }),
+    },
+    async ({ company_number, include }) =>
+      run(
+        "get_bundle",
+        `/company/${company_number}/bundle${include?.length ? `?include=${encodeURIComponent(include.join(","))}` : ""}`
+      )
   );
 
   server.registerTool(

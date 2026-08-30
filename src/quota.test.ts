@@ -164,6 +164,7 @@ describe("quota gate", () => {
       get_psc: { company_number: "00445790" },
       get_psc_chain: { company_number: "00445790" },
       get_network: { company_number: "00445790" },
+      get_bundle: { company_number: "00445790" },
     };
 
     for (const name of TOOL_NAMES) {

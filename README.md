@@ -88,6 +88,7 @@ the server locally than call ours.
 | Tool | What you get |
 |---|---|
 | `search_company` | Find a company by name → company number |
+| `get_bundle` | **Profile, compliance, financials, PSCs and directors in one call** - start here |
 | `get_company` | Profile: status, age, SIC descriptions, overdue flags |
 | `get_financials` | Turnover, net assets, profit/loss, employees — parsed from iXBRL, in GBP |
 | `get_directors` | Current board with appointment history across all their companies |
@@ -95,6 +96,22 @@ the server locally than call ours.
 | `get_psc_chain` | Ownership traversed to ultimate beneficial owners, with termination reasons |
 | `get_compliance` | **ECCTA identity-verification status** — who has verified, who is pending, who is overdue |
 | `get_network` | Companies connected by shared directors, to depth 2 |
+
+### On `get_bundle`
+
+Most questions about a company need several of these views at once. `get_bundle`
+returns them in a single request: **one call and one credit instead of five**,
+and one round trip instead of five. Pass `include` to fetch a subset, or omit it
+for all five sections.
+
+Each section carries exactly what its own endpoint returns, because the bundle
+is composed from those same handlers rather than reimplemented - so plan gates,
+caching and the ECCTA rules behave identically either way.
+
+**A null section is not an error.** Financials come back null for a company that
+has filed no machine-readable accounts, and compliance requires a Pro plan. Only
+a missing company is an error, and that is a 404. Report a null section as "not
+available", never as an absence of the underlying fact.
 
 ### On `get_compliance`
 
