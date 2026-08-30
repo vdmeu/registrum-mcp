@@ -20,6 +20,44 @@ const OVERVIEW_URL = "https://glama.ai/mcp/servers/vdmeu/registrum-mcp";
 // don't either).
 const ADMIN_URL = "https://glama.ai/mcp/servers/vdmeu/registrum-mcp/admin/repository";
 
+/**
+ * Work out WHY the sync button is missing, from the page we actually landed on.
+ *
+ * This used to report both possible causes at once and leave the reader to open
+ * a screenshot and decide. On 2026-08-31 the page was a plain sign-in wall and
+ * the script said "either the session expired or Glama changed the admin UI" -
+ * a diagnostic that has to be re-diagnosed by hand, which is the manual
+ * walkthrough this tooling exists to remove.
+ *
+ * The sign-in signals are deliberately narrow: a redirect to a sign-in URL, or
+ * Glama's own wall banner. Matching a bare "sign in" anywhere would make every
+ * UI change look like an expired session and send the reader to re-login
+ * forever.
+ */
+export function diagnoseMissingSyncButton({ url = "", title = "", bodyText = "" }) {
+  const onSignInUrl = /\/(sign-in|signin|login)\b/i.test(url);
+  const hasWallBanner = /you need to sign in to access this page/i.test(bodyText);
+
+  if (onSignInUrl || hasWallBanner) {
+    return {
+      cause: "expired-session",
+      message:
+        "The saved Glama session has expired - the admin page redirected to the sign-in wall.\n" +
+        "  Fix: node scripts/glama/login.mjs   (interactive GitHub sign-in, then re-run sync.mjs)\n" +
+        "  Screenshot of what it served: ",
+    };
+  }
+
+  return {
+    cause: "ui-changed",
+    message:
+      "Reached the admin page while signed in, but no 'Sync Server' control was on it -\n" +
+      "  Glama most likely changed the admin UI. Open the screenshot, find the real\n" +
+      "  label/selector, and update the candidates in sync.mjs.\n" +
+      "  Screenshot: ",
+  };
+}
+
 /** Try a list of candidate locators in order; return the first that's visible, or null. */
 async function firstVisible(page, candidates) {
   for (const locator of candidates) {
@@ -75,15 +113,17 @@ async function main() {
   if (!syncButton) {
     const screenshotPath = path.join(__dirname, "state", "admin-page-debug.png");
     await page.screenshot({ path: screenshotPath, fullPage: true });
-    console.error(
-      "Could not find a 'Sync Server' button. Saved a screenshot for debugging:\n  " + screenshotPath
-    );
-    console.error(
-      "Either the saved session has expired (re-run login.mjs) or Glama changed the admin UI - " +
-        "open the screenshot, find the real label/selector, and update the candidates in sync.mjs."
-    );
+    const { cause, message } = diagnoseMissingSyncButton({
+      url: page.url(),
+      title: await page.title().catch(() => ""),
+      bodyText: await page.locator("body").innerText().catch(() => ""),
+    });
+    console.error("Could not find a 'Sync Server' button.");
+    console.error("  " + message + screenshotPath);
     await browser.close();
-    process.exit(1);
+    // Distinct codes so a scheduled runner can tell "go and log in" from
+    // "a human needs to read a screenshot".
+    process.exit(cause === "expired-session" ? 2 : 1);
   }
 
   console.log("Found 'Sync Server' - clicking...");

@@ -38,6 +38,17 @@ own separate key just to *read* data). GitHub OAuth login itself has to happen
 in a real browser at least once. Everything downstream of that one login is
 now a command instead of a repeat manual walkthrough.
 
-If `sync.mjs` can't find the "Sync Server" button (Glama changed their UI, or
-the session expired), it saves a screenshot to `state/admin-page-debug.png`
-and tells you what to check rather than failing silently.
+If `sync.mjs` can't find the "Sync Server" button it saves a screenshot to
+`state/admin-page-debug.png` and reads the page it actually landed on to say
+**which** of the two causes it is, rather than listing both and leaving you to
+open the screenshot and decide:
+
+| Exit | Cause | What to do |
+|---|---|---|
+| `2` | Saved session expired - Glama served the sign-in wall | `node scripts/glama/login.mjs`, then re-run `sync.mjs` |
+| `1` | Signed in, but no sync control on the admin page - Glama changed the UI | Open the screenshot, find the real label, update the candidates in `sync.mjs` |
+
+The signals for "expired" are deliberately narrow (a redirect to a sign-in URL,
+or Glama's own wall banner). Matching a bare "sign in" anywhere on the page
+would make every UI change look like an expired session and send you to
+re-login forever - `src/glama-sync.test.ts` holds that case.
